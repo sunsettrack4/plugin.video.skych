@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<addon id="plugin.video.skych" name="Sky CH" version="0.1.0" provider-name="Jan-Luca Neumann">
+  <requires>
+      <import addon="xbmc.python" version="3.0.0"/>
+      <import addon="inputstream.adaptive"/>
+      <import addon="script.module.beautifulsoup4"/>
+      <import addon="script.module.requests"/>
+  </requires>
+  <extension point="xbmc.python.pluginsource" library="addon.py">
+    <provides>video</provides>
+  </extension>
+  <extension point="xbmc.addon.metadata">
+    <summary lang="en_GB">Sky CH Live TV + VoD</summary>
+    <description lang="en_GB">Video addon providing VoD streams by Sky Switzerland</description>
+    <description lang="de_DE">Video-Addon zur Wiedergabe der Live TV- und VoD-Streams von Sky Switzerland</description>
+    <disclaimer lang="en_GB">Widevine is required to use this addon.</disclaimer>
+    <disclaimer lang="de_DE">Widevine wird für das Abspielen der Streams benötigt.</disclaimer>
+    <platform>all</platform>
+    <license>GPL-3.0-or-later</license>
+    <website>https://sky.ch</website>
+    <email>sunsettrack4@gmail.com</email>
+    <source>http://github.com/sunsettrack4/plugin.video.skych</source>
+    <news>v0.1.0 (04/06/2021)
+      [new] Initial release
+    </news>
+    <assets>
+    </assets>
+  </extension>
+</addon>
