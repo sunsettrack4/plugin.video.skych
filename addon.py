@@ -47,12 +47,12 @@ def load_channels():
             if channel_disabled is False:
                 for link in item.findAll("a", {"class": "epg-channel-link"}):
                     for name in link.findAll("img"):
-                        channels.update({link["data-id"]: name["alt"]})
+                        channels.update({link["data-id"]: {"name": name["alt"], "type": web_type}})
 
     channel_listing = []
     for item in channels.keys():
-        url = build_url({'play': '4', 'id': item})
-        li = xbmcgui.ListItem(channels[item])
+        url = build_url({'play': '4', 'id': item, 'type': channels[item]["type"]})
+        li = xbmcgui.ListItem(channels[item]["name"])
         li.setArt({"thumb": f"https://s3.sky.ch/img/moviecover/ch/images/channel/{item}.png"})
         channel_listing.append((url, li, False))
 
@@ -60,8 +60,8 @@ def load_channels():
     xbmcplugin.endOfDirectory(__addon_handle__)
 
 
-def load_categories(content_type):
-    """Retrieve a list of all categories"""
+def load_show_categories(content_type):
+    """Retrieve a list of all show categories"""
 
     url = f"https://show.sky.ch/de/{'filme' if content_type == 'movie' else 'serien'}" \
         if lang == "de" else f"https://show.sky.ch/en/{'movies' if content_type == 'movie' else 'tv-series'}"
@@ -87,7 +87,35 @@ def load_categories(content_type):
     xbmcplugin.endOfDirectory(__addon_handle__)
 
 
-def load_contents(content_type, category):
+def load_sports_categories():
+    """Retrieve a list of all sports categories"""
+
+    url = f"https://sport.sky.ch/{'de' if lang == 'de' else 'en'}/sports"
+    home_page = requests.get(url, headers=headers, cookies={"SkyCookie": login()})
+
+    parse_home_page = BeautifulSoup(home_page.content, 'html.parser')
+    category_listing = []
+
+    for div_sports_container in parse_home_page.findAll("a", {"class": "module-sport"}):
+        category_dict = dict()
+        for sports_type in div_sports_container.findAll("div", {"class": "sport-type"}):
+            category_dict["title"] = sports_type.findAll("p")[0].text
+        for sports_img in div_sports_container.findAll("div", {"class": "sport-img"}):
+            category_dict["img"] = sports_img["style"].replace("background-image: url('", "").replace("');", "")
+        category_listing.append(category_dict)
+
+    menu_listing = []
+    for category in category_listing:
+        li = xbmcgui.ListItem(label=category["title"])
+        li.setArt({"thumb": category["img"], "fanart": category["img"]})
+        url = build_url({'mode': 'sports', 'category': category["title"]})
+        menu_listing.append((url, li, True))
+
+    xbmcplugin.addDirectoryItems(__addon_handle__, menu_listing, len(menu_listing))
+    xbmcplugin.endOfDirectory(__addon_handle__)
+
+
+def load_show_contents(content_type, category):
     """Retrieve all movie/series items mentioned on webpage"""
 
     url = f"https://show.sky.ch/de/{'filme' if content_type == 'movie' else 'serien'}" if lang == "de" else \
@@ -137,6 +165,38 @@ def load_contents(content_type, category):
                                      'year': int(item["details"]["year"])})
             url = build_url({'mode': content_type, 'id': item["id"], "url": item["url"]})
             menu_listing.append((url, li, True))
+
+    xbmcplugin.addDirectoryItems(__addon_handle__, menu_listing, len(menu_listing))
+    xbmcplugin.endOfDirectory(__addon_handle__)
+
+
+def load_sports_contents(category):
+    """Retrieve all sports items mentioned on webpage"""
+
+    url = f"https://sport.sky.ch/{'de' if lang == 'de' else 'en'}/{category.lower().replace(' ', '-')}"
+    home_page = requests.get(url, headers=headers, cookies={"SkyCookie": login()})
+
+    parse_home_page = BeautifulSoup(home_page.content, 'html.parser')
+    menu_listing_prepare = []
+
+    main_img = ""
+    for div_header in parse_home_page.findAll("div", {"class": "bg-header"}):
+        main_img = div_header["style"].replace("background-image: url('", "").replace("');", "")
+
+    for competition_module in parse_home_page.findAll("a", {"class": "module-tournament"}):
+        menu_dict = dict()
+        for title in competition_module.findAll("div", {"class": "tournament-name"}):
+            menu_dict["title"] = title.findAll("p")[0].text
+        menu_dict["img"] = competition_module.findAll("img")[0]["src"]
+        menu_dict["url"] = competition_module["href"]
+        menu_listing_prepare.append(menu_dict)
+
+    menu_listing = []
+    for item in menu_listing_prepare:
+        li = xbmcgui.ListItem(label=item['title'])
+        li.setArt({"thumb": item["img"], "fanart": main_img})
+        url = build_url({'mode': 'sports', "url": item["url"]})
+        menu_listing.append((url, li, True))
 
     xbmcplugin.addDirectoryItems(__addon_handle__, menu_listing, len(menu_listing))
     xbmcplugin.endOfDirectory(__addon_handle__)
@@ -200,7 +260,7 @@ def load_content_details(content_type, content_id, content_url):
                                  'year': int(menu_dict["details"]["year"]), 'plot': menu_dict["desc"],
                                  'director': menu_dict["cast"]["director"], 'cast': menu_dict["cast"]["actor"],
                                  'duration': duration * 60})
-            url = build_url({'id': content_id, "play": item[1]})
+            url = build_url({'id': content_id, "play": item[1], "type": "show"})
             menu_listing.append((url, li, False))
 
     # SERIES
@@ -273,17 +333,201 @@ def load_content_details(content_type, content_id, content_url):
                                  'year': int(menu_dict["details"]["year"]), 'plot': content_dict[item]["desc"],
                                  'director': menu_dict["cast"]["director"], 'cast': menu_dict["cast"]["actor"],
                                  'duration': int(content_dict[item]["duration"]) * 60})
-            url = build_url({'id': item, "play": content_dict[item]["type"]})
+            url = build_url({'id': item, "play": content_dict[item]["type"], "type": "show"})
             menu_listing.append((url, li, False))
 
     xbmcplugin.addDirectoryItems(__addon_handle__, menu_listing, len(menu_listing))
     xbmcplugin.endOfDirectory(__addon_handle__)
 
 
-def get_stream(channel_id, content_type):
+def get_title(event_infos):
+    """Retrieve title from event containers"""
+
+    title = ""
+
+    for data in event_infos:
+        index = 0
+        for i in data.findAll("p"):
+            if "class" in i.attrs:
+                if "event-info-count-up" not in i.attrs["class"]:
+                    title = i.text if index == 0 else f"{title} {i.text}"
+                else:
+                    continue
+            else:
+                title = i.text if index == 0 else f"{title} {i.text}"
+            index = index + 1
+
+    return title
+
+
+def get_team_info(title, item):
+    """Retrieve team/player info from containers"""
+
+    team = [i.text for team in item.findAll("div", {"class": "team"})
+            for i in team.findAll("p", {"class": "long-name"})]
+    player = [i.text for player in item.findAll("div", {"class": "player"}) for i in player.findAll("p")]
+    return f"{title}: {team[0]} vs {team[1]}" if len(team) > 0 else \
+        f"{title}: {player[0]} vs {player[1]}" if len(player) > 0 else title
+
+
+def load_sports_tournament_contents(content_url, content_type=None, content_value=None):
+    """Get tournament listings"""
+
+    url = f"https://sport.sky.ch{content_url}"
+    tv_details = requests.get(url, headers=headers, cookies={"SkyCookie": login()})
+
+    parse_content_page = BeautifulSoup(tv_details.content, 'html.parser')
+
+    content_list = []
+    menu_listing = []
+
+    # Image
+    main_img = ""
+    for div_header in parse_content_page.findAll("div", {"class": "bg-header"}):
+        main_img = div_header["style"].replace("background-image: url('", "").replace("');", "")
+
+    # Content image + text
+    content_img = ""
+    content_text = ""
+    for div_content in parse_content_page.findAll("div", {"class": "textual-content"}):
+        for item in div_content.findAll("img"):
+            content_img = item["src"]
+            content_text = item["alt"]
+            break
+        for text in div_content.findAll("div", {"class": "text-wrapper"}):
+            for i in text.findAll("p"):
+                content_text = f"{content_text}\n\n{i.text}"
+
+    # VIDEOS PAGE
+    if content_type == "videos_all":
+        content_type = "video_play"
+        for extra in parse_content_page.findAll("section", {"class": "listing"}):
+            for item in extra.findAll("a"):
+                content_dict = dict()
+                content_dict["id"] = item["data-id"]
+                content_dict["title"] = get_title(item.findAll("div", {"class": "text-wrapper"}))
+                for img in item.findAll("img"):
+                    content_dict["img"] = img["src"]
+                content_list.append(content_dict)
+
+    # SPECIALS / VIDEOS MAIN PAGE
+    if content_type in ("special", "videos", "section"):
+        for extra in parse_content_page.findAll("div", {"class": "carousel-container"}):
+            for header in extra.findAll("h2"):
+                if content_value and content_value == header.text:
+                    if content_type in ("special", "section"):
+                        for item in extra.findAll("a"):
+                            content_dict = dict()
+                            content_dict["id"] = item["href"].split("/")[-1]
+                            title = get_title(item.findAll("div", {"class": "event-infos"}))
+                            title = get_team_info(title, item)
+                            content_dict["title"] = title
+                            content_list.append(content_dict)
+                    if content_type == "videos":
+                        content_dict = dict()
+                        content_dict["id"] = "show_all"
+                        content_dict["title"] = "Alles sehen" if lang == "de" else "Show All"
+                        content_dict["url"] = [url for url in extra.findAll("a", {"class": "see-all"})][0]["href"]
+                        content_list.append(content_dict)
+                        for item in extra.findAll("a", {"class": "module-highlight"}):
+                            content_dict = dict()
+                            content_dict["id"] = item["data-id"]
+                            content_dict["title"] = get_title(item.findAll("div", {"class": "text-wrapper"}))
+                            content_dict["img"] = item.findAll("img")[0]["src"]
+                            content_list.append(content_dict)
+                    content_type = "special_play" if content_type in ("special", "section") else "video_play"
+                if content_value == "None":
+                    content_list.append({"title": header.text, "value": header.text, "type": content_type,
+                                         "url": content_url})
+
+    # SUB PAGE
+    if content_type == "sub" and content_value:
+        for sub_stage in parse_content_page.findAll("div", {"class": "substage-container",
+                                                            "data-substage_id": content_value}):
+            for item in sub_stage.findAll("a"):
+                content_dict = dict()
+                content_dict["id"] = item["href"].split("/")[-1]
+                title = get_title(item.findAll("div", {"class": "event-infos"}))
+                title = get_team_info(title, item)
+                content_dict["title"] = title
+                content_list.append(content_dict)
+
+    # MAIN PAGE
+    if not content_type:
+
+        # Sub stages
+        for sub_stage in parse_content_page.findAll("select", {"id": "skyFilterSelect_subStages"}):
+            for option in sub_stage.findAll("option"):
+                content_dict = dict()
+                content_dict["type"] = "sub"
+                content_dict["title"] = option.text
+                content_dict["value"] = option["value"]  # value
+                content_list.append(content_dict)
+
+        # Specials
+        for nav_option in parse_content_page.findAll("section", {"class": "header-nav"}):
+            for item in nav_option.findAll("a"):
+                content_dict = dict()
+                if item["data-id"] == "tab-special_broadcasts":
+                    content_dict["type"] = "special"
+                    content_dict["title"] = item.text
+                    content_dict["url"] = item["href"]  # url
+                    content_list.append(content_dict)
+                if item["data-id"] == "tab-highlights":
+                    content_dict["type"] = "videos"
+                    content_dict["title"] = item.text
+                    content_dict["url"] = item["href"]  # url
+                    content_list.append(content_dict)
+
+        # Sections
+        if len(content_list) == 0:
+            for section in parse_content_page.findAll("section", {"class": "list-carousels"}):
+                for item in section.findAll("h2"):
+                    content_dict = dict()
+                    content_dict["type"] = "section"
+                    content_dict["title"] = item.text
+                    content_dict["value"] = item.text
+                    content_list.append(content_dict)
+
+    # Menu creation for main + special + videos
+    if not content_type or content_type == "special" or content_type == "videos":
+
+        for item in content_list:
+            li = xbmcgui.ListItem(label=item['title'])
+            li.setArt({"thumb": content_img, "fanart": main_img})
+            li.setInfo('video', {'plot': content_text})
+            url = build_url({"mode": "sports", "type": item["type"], "title": item['title'],
+                             "value": item["value"] if item.get("value") else "None",
+                             "url": item["url"] if item.get("url") else content_url})
+            menu_listing.append((url, li, True))
+
+    # Menu creation for sub + special playback
+    if content_type in ("sub", "special_play", "video_play"):
+
+        for item in content_list:
+            if item["id"] != "show_all":  # PLAYBACK ITEMS
+                li = xbmcgui.ListItem(label=item['title'])
+                li.setArt({"thumb": item.get('img', content_img), "fanart": main_img})
+                li.setInfo('video', {'plot': content_text})
+                play_id = "5" if content_type == "video_play" else "1"
+                url = build_url({'id': item['id'], "play": play_id, "type": "sport"})
+                menu_listing.append((url, li, False))
+            else:  # SHOW ALL
+                li = xbmcgui.ListItem(label=item['title'])
+                li.setArt({"thumb": content_img, "fanart": main_img})
+                li.setInfo('video', {'plot': content_text})
+                url = build_url({"mode": "sports", "type": "videos_all", "title": item['title'],
+                                 "value": "videos_all", "url": item["url"]})
+                menu_listing.append((url, li, True))
+
+    xbmcplugin.addDirectoryItems(__addon_handle__, menu_listing, len(menu_listing))
+    xbmcplugin.endOfDirectory(__addon_handle__)
+
+
+def get_stream(channel_id, content_type, sky_type):
     """Retrieve the live tv playlist"""
 
-    url = f"https://show.sky.ch/{lang}/SkyPlayerAjax/SkyPlayer?id={channel_id}&contentType={content_type}"
+    url = f"https://{sky_type}.sky.ch/{lang}/SkyPlayerAjax/SkyPlayer?id={channel_id}&contentType={content_type}"
     new_header = headers
     new_header['x-requested-with'] = 'XMLHttpRequest'
 
@@ -293,14 +537,15 @@ def get_stream(channel_id, content_type):
     if tv_json["Success"]:
         stream_url = tv_json["Url"]
         license_url = tv_json["LicenseUrl"]
-        return stream_url, license_url
+        title = tv_json["YouboraParams"]["Title"]
+        return stream_url, license_url, title
     else:
         xbmcgui.Dialog().notification(__addonname__, "Failed to retrieve the stream. "
                                                      "Please check your credentials/subscriptions.",
                                       xbmcgui.NOTIFICATION_ERROR)
 
 
-def playback(stream_url, license_url):
+def playback(stream_url, license_url, title):
     """Pass the urls to the player"""
 
     li = xbmcgui.ListItem(path=stream_url)
@@ -312,6 +557,9 @@ def playback(stream_url, license_url):
     li.setProperty('inputstream', 'inputstream.adaptive')
     li.setProperty('inputstream.adaptive.manifest_type', 'mpd')
     li.setProperty("IsPlayable", "true")
+
+    li.setInfo("video", {"title": title})
+
     xbmcplugin.setResolvedUrl(__addon_handle__, True, li)
 
     xbmc.Player().play(item=stream_url, listitem=li)
@@ -332,24 +580,42 @@ def router(item):
         elif params.get("mode") and params.get("id") and params.get("url"):
             load_content_details(params["mode"], params["id"], params["url"])
 
-        # MOVIE/SERIES LIST
-        elif params.get("mode") and params.get("category"):
-            load_contents(params["mode"], params["category"])
+        # SPORTS TOURNAMENT CONTENTS
+        elif params.get("mode") and params.get("url"):
 
-        # MOVIE/SERIES CATEGORY LIST
+            # SUB MENU
+            if params.get("type") and params.get("value"):
+                load_sports_tournament_contents(params["url"], params["type"], params["value"])
+
+            # MAIN MENU
+            else:
+                load_sports_tournament_contents(params["url"])
+
+        # CONTENT LIST
+        elif params.get("mode") and params.get("category"):
+            if params['mode'] in ('movie', 'show'):
+                load_show_contents(params["mode"], params["category"])
+            elif params['mode'] == "sports":
+                load_sports_contents(params["category"])
+
+        # CATEGORY LIST
         elif params.get("mode"):
-            load_categories(params["mode"])
+            if params['mode'] in ('movie', 'show'):
+                load_show_categories(params["mode"])
+            elif params['mode'] == "sports":
+                load_sports_categories()
 
         # LIVE TV / VOD STREAM
-        elif params.get("play") and params.get("id"):
-            stream_params = get_stream(params["id"], params["play"])
+        elif params.get("play") and params.get("id") and params.get("type"):
+            stream_params = get_stream(params["id"], params["play"], params["type"])
             if stream_params:
-                playback(stream_params[0], stream_params[1])
+                playback(stream_params[0], stream_params[1], stream_params[2])
 
     else:
         # MAIN
         main_listing = []
-        for mode in [("live", "Live TV"), ("movie", "Cinema VoD"), ("show", "Entertainment VoD")]:
+        for mode in [("live", "Live TV"), ("movie", "Cinema VoD"), ("show", "Entertainment VoD"),
+                     ("sports", "Sport VoD")]:
             url = build_url({'mode': mode[0]})
             li = xbmcgui.ListItem(mode[1])
             main_listing.append((url, li, True))
@@ -363,7 +629,7 @@ def login():
 
     # Retrieve existing cookie from file
     if os.path.exists(f"{data_dir}/cookie.txt"):
-        if (int(os.path.getmtime(f"{data_dir}/cookie.txt")) - int(time())) > 3600:
+        if (int(os.path.getmtime(f"{data_dir}/cookie.txt")) - int(time())) > 2592000:
             os.remove(f"{data_dir}/cookie.txt")
         else:
             with open(f"{data_dir}/cookie.txt", "r") as file:

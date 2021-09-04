@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<addon id="plugin.video.skych" name="Sky CH" version="0.1.0" provider-name="Jan-Luca Neumann">
+<addon id="plugin.video.skych" name="Sky CH" version="0.1.1" provider-name="Jan-Luca Neumann">
   <requires>
       <import addon="xbmc.python" version="3.0.0"/>
       <import addon="inputstream.adaptive"/>
@@ -20,10 +20,14 @@
     <website>https://sky.ch</website>
     <email>sunsettrack4@gmail.com</email>
     <source>http://github.com/sunsettrack4/plugin.video.skych</source>
-    <news>v0.1.0 (04/06/2021)
+    <news>v0.1.1 (29/08/2021)
+      [new] Sport VoD section
+
+      v0.1.0 (04/06/2021)
       [new] Initial release
     </news>
     <assets>
+      <icon>icon.png</icon>
     </assets>
   </extension>
 </addon>
