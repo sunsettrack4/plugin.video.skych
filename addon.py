@@ -38,7 +38,7 @@ def load_channels():
     for web_type in ("show", "sport"):
         url = f"https://{web_type}.sky.ch/de/live-auf-tv" if lang == "de" else \
             f"https://{web_type}.sky.ch/en/live-of-tv"
-        live_page = requests.get(url, headers=headers, cookies={"SkyCookie": login()})
+        live_page = requests.get(url, headers=headers, cookies={"SkyCake": login()})
 
         parse_live_page = BeautifulSoup(live_page.content, 'html.parser')
 
@@ -65,7 +65,7 @@ def load_show_categories(content_type):
 
     url = f"https://show.sky.ch/de/{'filme' if content_type == 'movie' else 'serien'}" \
         if lang == "de" else f"https://show.sky.ch/en/{'movies' if content_type == 'movie' else 'tv-series'}"
-    home_page = requests.get(url, headers=headers, cookies={"SkyCookie": login()})
+    home_page = requests.get(url, headers=headers, cookies={"SkyCake": login()})
 
     parse_home_page = BeautifulSoup(home_page.content, 'html.parser')
     category_listing = []
@@ -91,7 +91,7 @@ def load_sports_categories():
     """Retrieve a list of all sports categories"""
 
     url = f"https://sport.sky.ch/{'de' if lang == 'de' else 'en'}/sports"
-    home_page = requests.get(url, headers=headers, cookies={"SkyCookie": login()})
+    home_page = requests.get(url, headers=headers, cookies={"SkyCake": login()})
 
     parse_home_page = BeautifulSoup(home_page.content, 'html.parser')
     category_listing = []
@@ -120,7 +120,7 @@ def load_show_contents(content_type, category):
 
     url = f"https://show.sky.ch/de/{'filme' if content_type == 'movie' else 'serien'}" if lang == "de" else \
         f"https://show.sky.ch/en/{'movies' if content_type == 'movie' else 'tv-series'}"
-    home_page = requests.get(url, headers=headers, cookies={"SkyCookie": login()})
+    home_page = requests.get(url, headers=headers, cookies={"SkyCake": login()})
 
     parse_home_page = BeautifulSoup(home_page.content, 'html.parser')
     menu_listing_prepare = []
@@ -174,7 +174,7 @@ def load_sports_contents(category):
     """Retrieve all sports items mentioned on webpage"""
 
     url = f"https://sport.sky.ch/{'de' if lang == 'de' else 'en'}/{category.lower().replace(' ', '-')}"
-    home_page = requests.get(url, headers=headers, cookies={"SkyCookie": login()})
+    home_page = requests.get(url, headers=headers, cookies={"SkyCake": login()})
 
     parse_home_page = BeautifulSoup(home_page.content, 'html.parser')
     menu_listing_prepare = []
@@ -206,7 +206,7 @@ def load_content_details(content_type, content_id, content_url):
     """Get advanced movie/series details"""
 
     url = f"https://show.sky.ch{content_url}"
-    tv_details = requests.get(url, headers=headers, cookies={"SkyCookie": login()})
+    tv_details = requests.get(url, headers=headers, cookies={"SkyCake": login()})
 
     parse_content_page = BeautifulSoup(tv_details.content, 'html.parser')
 
@@ -282,7 +282,7 @@ def load_content_details(content_type, content_id, content_url):
                 index = index + 1
 
                 url = f"https://show.sky.ch{content_url}/{season['data-link']}"
-                tv_details = requests.get(url, headers=headers, cookies={"SkyCookie": login()})
+                tv_details = requests.get(url, headers=headers, cookies={"SkyCake": login()})
 
                 parse_season_page = BeautifulSoup(tv_details.content, 'html.parser')
 
@@ -374,7 +374,7 @@ def load_sports_tournament_contents(content_url, content_type=None, content_valu
     """Get tournament listings"""
 
     url = f"https://sport.sky.ch{content_url}"
-    tv_details = requests.get(url, headers=headers, cookies={"SkyCookie": login()})
+    tv_details = requests.get(url, headers=headers, cookies={"SkyCake": login()})
 
     parse_content_page = BeautifulSoup(tv_details.content, 'html.parser')
 
@@ -531,7 +531,7 @@ def get_stream(channel_id, content_type, sky_type):
     new_header = headers
     new_header['x-requested-with'] = 'XMLHttpRequest'
 
-    tv = requests.get(url, headers=new_header, cookies={"SkyCookie": login()})
+    tv = requests.get(url, headers=new_header, cookies={"SkyCake": login()})
     tv_json = tv.json()
 
     if tv_json["Success"]:
@@ -671,7 +671,7 @@ def login():
     login_page = requests.post(login_url, timeout=5, headers=headers, cookies=cookie, data=data,
                                allow_redirects=False)
 
-    cookie = login_page.cookies.get("SkyCookie", None)
+    cookie = login_page.cookies.get("SkyCake", None)
 
     if cookie is None:
         xbmcgui.Dialog().notification(__addonname__,
