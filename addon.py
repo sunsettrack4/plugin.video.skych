@@ -546,6 +546,16 @@ def get_stream(channel_id, content_type, sky_type):
 
 
 def playback(stream_url, license_url, title):
+    """Get player infolabels"""
+
+    title = xbmc.getInfoLabel("ListItem.Title")
+    thumb = xbmc.getInfoLabel("ListItem.Thumb")
+    info = xbmc.getInfoLabel("ListItem.Plot")
+    genre = xbmc.getInfoLabel("ListItem.Genre")
+    year = xbmc.getInfoLabel("ListItem.Year")
+    director = xbmc.getInfoLabel("ListItem.Director")
+    duration = xbmc.getInfoLabel("ListItem.Duration")
+
     """Pass the urls to the player"""
 
     li = xbmcgui.ListItem(path=stream_url)
@@ -558,7 +568,10 @@ def playback(stream_url, license_url, title):
     li.setProperty('inputstream.adaptive.manifest_type', 'mpd')
     li.setProperty("IsPlayable", "true")
 
-    li.setInfo("video", {"title": title})
+    li.setProperty("IsPlayable", "true")
+    li.setInfo("video", {"title": title, 'genre': genre, 'year': year, 'director': director, 'duration': duration})
+    li.setArt({'thumb': thumb})
+    li.setInfo('video', {'plot': info})
 
     xbmcplugin.setResolvedUrl(__addon_handle__, True, li)
 
