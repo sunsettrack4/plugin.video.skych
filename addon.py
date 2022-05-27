@@ -100,6 +100,7 @@ def load_sports_categories():
         category_dict = dict()
         for sports_type in div_sports_container.findAll("div", {"class": "sport-type"}):
             category_dict["title"] = sports_type.findAll("p")[0].text
+            category_dict["href"] = div_sports_container["href"]
         for sports_img in div_sports_container.findAll("div", {"class": "sport-img"}):
             category_dict["img"] = sports_img["style"].replace("background-image: url('", "").replace("');", "")
         category_listing.append(category_dict)
@@ -108,7 +109,7 @@ def load_sports_categories():
     for category in category_listing:
         li = xbmcgui.ListItem(label=category["title"])
         li.setArt({"thumb": category["img"], "fanart": category["img"]})
-        url = build_url({'mode': 'sports', 'category': category["title"]})
+        url = build_url({'mode': 'sports', 'category': category["href"]})
         menu_listing.append((url, li, True))
 
     xbmcplugin.addDirectoryItems(__addon_handle__, menu_listing, len(menu_listing))
@@ -173,7 +174,7 @@ def load_show_contents(content_type, category):
 def load_sports_contents(category):
     """Retrieve all sports items mentioned on webpage"""
 
-    url = f"https://sport.sky.ch/{'de' if lang == 'de' else 'en'}/{category.lower().replace(' ', '-')}"
+    url = f"https://sport.sky.ch/{category}"
     home_page = requests.get(url, headers=headers, cookies={"SkyCake": login()})
 
     parse_home_page = BeautifulSoup(home_page.content, 'html.parser')
@@ -547,13 +548,15 @@ def get_stream(channel_id, content_type, sky_type):
 
 def playback(stream_url, license_url, title):
     """Get player infolabels"""
-
-    thumb = xbmc.getInfoLabel("ListItem.Thumb")
-    plot = xbmc.getInfoLabel("ListItem.Plot")
-    genre = xbmc.getInfoLabel("ListItem.Genre")
-    year = xbmc.getInfoLabel("ListItem.Year")
-    director = xbmc.getInfoLabel("ListItem.Director")
-    duration = xbmc.getInfoLabel("ListItem.Duration")
+    try:
+        thumb = xbmc.getInfoLabel("ListItem.Thumb")
+        plot = xbmc.getInfoLabel("ListItem.Plot")
+        genre = xbmc.getInfoLabel("ListItem.Genre")
+        year = xbmc.getInfoLabel("ListItem.Year")
+        director = xbmc.getInfoLabel("ListItem.Director")
+        duration = xbmc.getInfoLabel("ListItem.Duration")
+    except:
+        pass
 
     """Pass the urls and infolabels to the player"""
 
@@ -568,9 +571,11 @@ def playback(stream_url, license_url, title):
     li.setProperty("IsPlayable", "true")
 
     li.setProperty("IsPlayable", "true")
-    li.setInfo("video", {"title": title, 'genre': genre, 'year': year, 'director': director, 'duration': duration})
-    li.setArt({'thumb': thumb})
-    li.setInfo('video', {'plot': plot})
+    try:
+        li.setInfo("video", {"title": title, 'plot': plot, 'genre': genre, 'year': year, 'director': director, 'duration': duration})
+        li.setArt({'thumb': thumb})
+    except:
+        li.setInfo("video", {"title": title})
 
     xbmcplugin.setResolvedUrl(__addon_handle__, True, li)
 
