@@ -1,5 +1,5 @@
 from bs4 import BeautifulSoup
-from time import time
+import time
 import sys
 import os
 import requests
@@ -9,8 +9,8 @@ import xbmcgui
 import xbmcaddon
 import xbmcplugin
 
-headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) '
-                         'Chrome/81.0.4044.138 Safari/537.36'}
+headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 11_4) AppleWebKit/605.1.15 (KHTML, like Gecko) '
+                         'Version/14.1 Safari/605.1.15'}
 
 __addon__ = xbmcaddon.Addon()
 __addonname__ = __addon__.getAddonInfo('name')
@@ -448,6 +448,8 @@ def load_sports_tournament_contents(content_url, content_type=None, content_valu
             for item in sub_stage.findAll("a"):
                 content_dict = dict()
                 content_dict["id"] = item["href"].split("/")[-1]
+                if "#" in content_dict["id"]:
+                    content_dict["id"] = content_dict["id"].replace("#", "")
                 title = get_title(item.findAll("div", {"class": "event-infos"}))
                 title = get_team_info(title, item)
                 content_dict["title"] = title
@@ -559,26 +561,17 @@ def playback(stream_url, license_url, title):
         pass
 
     """Pass the urls and infolabels to the player"""
-
+    if ".mpd" in stream_url:
+        stream_url = stream_url.replace(".mpd", ".m3u8")
+        stream_url = stream_url.replace("-dash-", "-hls7-")
+    
     li = xbmcgui.ListItem(path=stream_url)
-
-    if license_url is not None:
-        li.setProperty('inputstream.adaptive.license_key', license_url + "||a{SSM}|")
-        li.setProperty('inputstream.adaptive.license_type', "com.widevine.alpha")
-
-    li.setProperty('inputstream', 'inputstream.adaptive')
-    li.setProperty('inputstream.adaptive.manifest_type', 'mpd')
-    li.setProperty("IsPlayable", "true")
-
     li.setProperty("IsPlayable", "true")
     try:
         li.setInfo("video", {"title": title, 'plot': plot, 'genre': genre, 'year': year, 'director': director, 'duration': duration})
         li.setArt({'thumb': thumb})
     except:
         li.setInfo("video", {"title": title})
-
-    xbmcplugin.setResolvedUrl(__addon_handle__, True, li)
-
     xbmc.Player().play(item=stream_url, listitem=li)
 
 
@@ -643,25 +636,18 @@ def router(item):
 
 def login():
     """Retrieve the session cookie to access the video content"""
-
+    
     # Retrieve existing cookie from file
     if os.path.exists(f"{data_dir}/cookie.txt"):
-        if (int(os.path.getmtime(f"{data_dir}/cookie.txt")) - int(time())) > 2592000:
-            os.remove(f"{data_dir}/cookie.txt")
+        modified_time=os.path.getmtime(f"{data_dir}/cookie.txt")
+        if time.time()-modified_time > 3600:
+            os.remove(f"{data_dir}/cookie.txt")                
         else:
             with open(f"{data_dir}/cookie.txt", "r") as file:
-                cookie = file.read()
+                sky_cookie = file.read()
                 file.close()
-                return cookie
-
-    # Check service country
-    url = "https://sky.ch"
-    check_page = requests.get(url, headers=headers)
-    if "out-of-country" in check_page.url:
-        xbmcgui.Dialog().notification(__addonname__, "Out of country, please check your IP address.",
-                                      xbmcgui.NOTIFICATION_ERROR)
-        return ""
-
+                return sky_cookie
+    
     # Get username and password
     __login = __addon__.getSetting("username")
     __password = __addon__.getSetting("password")
@@ -671,36 +657,44 @@ def login():
                                       xbmcgui.NOTIFICATION_ERROR)
         return ""
 
-    # Login to webservice
-    login_url = f'https://www.sky.ch/{lang}/login'
-    login_page = requests.get(login_url, timeout=5, headers=headers)
-
-    cookie_token = login_page.cookies.get("__RequestVerificationToken", None)
-    login_page_parse = BeautifulSoup(login_page.content, 'html.parser')
-    app_token_reference = login_page_parse.find('input', {'name': '__RequestVerificationToken'})
-    page_token = app_token_reference.get("value", None)
-    cookie = {"__RequestVerificationToken": cookie_token}
-
-    data = {'username': __login, 'password': __password, 'rememberMe': 'on', 'mode': '',
-            'returnUrl': '', 'subscriptionUrl': '/de/subscription', 'hasHomeMadeCaptcha': 'false',
-            '__RequestVerificationToken': page_token}
-
-    login_page = requests.post(login_url, timeout=5, headers=headers, cookies=cookie, data=data,
-                               allow_redirects=False)
-
-    cookie = login_page.cookies.get("SkyCake", None)
-
-    if cookie is None:
-        xbmcgui.Dialog().notification(__addonname__,
-                                      "Failed to retrieve the session cookie. Please check your credentials.",
-                                      xbmcgui.NOTIFICATION_ERROR)
-        return ""
-    else:
+    # Retrieve cookie from sky.ch
+    login_headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 11_4) AppleWebKit/605.1.15 (KHTML, like Gecko) '
+                             'Version/14.1 Safari/605.1.15'}  
+    session_data = {}
+    cookies = {}
+    login_headers.update({"referer": "https://show.sky.ch/de/tv/", "tv": "AppleTv"})
+    login_url = 'https://show.sky.ch/de/login?forceClassicalTvLogin=True'
+    auth_url = 'https://show.sky.ch/de/Authentication/Login'
+    app_url = 'https://show.sky.ch/de/AppTv/Connect'
+    cookie_url = 'https://raw.githubusercontent.com/sunsettrack4/zattoo_tvh/additional/cookies.json'
+    try:
+        login_page = requests.get(login_url, timeout=5, headers=login_headers)
+        login_page.raise_for_status()
+        cookie_page = requests.get(cookie_url, timeout=5)
+        cookie_page.raise_for_status()
+        cookie_check = cookie_page.json()
+        cookie_token = login_page.cookies.get(cookie_check["rvt"])
+        asp_cookie = login_page.cookies.get(cookie_check["asp"])
+        login_page_parse = BeautifulSoup(login_page.content, 'html.parser')
+        app_token_reference = login_page_parse.find('input', {'name': cookie_check["rvtp"]})
+        page_token = app_token_reference.get("value")        
+        cookies = {cookie_check["rvt"]: cookie_token, cookie_check["asp"]: asp_cookie,
+                        "SkyTvDevice": '{"isSky":true,"type":{"code":"Desktop"},"year":"","keys":{"enter":13,"back":461,'
+                                       '"up":38,"down":40,"left":37,"right":39,"play":415,"pause":19,"playPause":-1,'
+                                       '"ff":417,"rew":412,"stop":413,"search":-1,"rew10":-1,"ff10":-1,"key0":-1,'
+                                       '"key1":-1,"key2":-1,"key3":-1,"key4":-1,"key5":-1,"key6":-1,"key7":-1,'
+                                       '"key8":-1,"key9":-1}}'}
+        data = {'username': __login, 'password': __password, cookie_check["rvtp"]: page_token, 'returnUrl': 'Home/HomeTv', 'subscriptionUrl': '/de/subscription'}
+        login_page = requests.post(auth_url, timeout=5, headers=login_headers, cookies=cookies, data=data, allow_redirects=False)
+        login_page.raise_for_status()
+        sky_cookie = login_page.cookies.get(cookie_check["cc"])
         with open(f"{data_dir}/cookie.txt", "w") as file:
-            file.write(cookie)
+            file.write(sky_cookie)
             file.close()
-        return cookie
-
+        return sky_cookie
+    except:
+        xbmcgui.Dialog().notification(__addonname__, "Failed to retrieve cookie from sky.ch.", xbmcgui.NOTIFICATION_ERROR)
+        return ""
 
 if __name__ == "__main__":
     router(sys.argv[2])
