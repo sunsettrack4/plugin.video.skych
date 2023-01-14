@@ -8,13 +8,14 @@ import xbmc
 import xbmcgui
 import xbmcaddon
 import xbmcplugin
+import xbmcvfs
 
 headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 11_4) AppleWebKit/605.1.15 (KHTML, like Gecko) '
                          'Version/14.1 Safari/605.1.15'}
 
 __addon__ = xbmcaddon.Addon()
 __addonname__ = __addon__.getAddonInfo('name')
-data_dir = xbmc.translatePath(__addon__.getAddonInfo('profile'))
+data_dir = xbmcvfs.translatePath(__addon__.getAddonInfo('profile'))
 
 base_url = sys.argv[0]
 __addon_handle__ = int(sys.argv[1])
