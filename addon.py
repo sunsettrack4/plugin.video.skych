@@ -697,7 +697,7 @@ def login():
         data = {'username': __login, 'password': __password, cookie_check["rvtp"]: page_token, 'returnUrl': 'Home/HomeTv', 'subscriptionUrl': '/de/subscription'}
         login_page = requests.post(auth_url, timeout=5, headers=login_headers, cookies=cookies, data=data, allow_redirects=False)
         login_page.raise_for_status()
-        sky_cookie = {cookie_check["cc"]: login_page.cookies.get(cookie_check["cc"]), cookie_check["asp"]: asp_cookie, "DesktopUUID": str(uuid4()).replace("-", "")}
+        sky_cookie = {cookie_check["cc"]: login_page.cookies.get(cookie_check["cc"]), cookie_check["cc2"]: login_page.cookies.get(cookie_check["cc"]), cookie_check["asp"]: asp_cookie, "DesktopUUID": str(uuid4()).replace("-", "")}
         with open(f"{data_dir}/cookie.txt", "w") as file:
             file.write(json.dumps(sky_cookie))
             file.close()
