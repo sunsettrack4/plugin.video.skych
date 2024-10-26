@@ -12,7 +12,9 @@ import xbmcaddon
 import xbmcplugin
 import xbmcvfs
 
-headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/115.0'}
+requests.urllib3.disable_warnings()
+
+headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:127.0) Gecko/20100101 Firefox/127.0', "accept-language": "de"}
 
 __addon__ = xbmcaddon.Addon()
 __addonname__ = __addon__.getAddonInfo('name')
@@ -40,7 +42,7 @@ def load_channels():
     for web_type in ("show", "sport"):
         url = f"https://{web_type}.sky.ch/de/live-auf-tv" if lang == "de" else \
             f"https://{web_type}.sky.ch/en/live-of-tv"
-        live_page = requests.get(url, headers=headers, cookies=login())
+        live_page = requests.get(url, headers=headers, cookies=login(), verify=False)
 
         parse_live_page = BeautifulSoup(live_page.content, 'html.parser')
 
@@ -67,7 +69,7 @@ def load_show_categories(content_type):
 
     url = f"https://show.sky.ch/de/{'filme' if content_type == 'movie' else 'serien'}" \
         if lang == "de" else f"https://show.sky.ch/en/{'movies' if content_type == 'movie' else 'tv-series'}"
-    home_page = requests.get(url, headers=headers, cookies=login())
+    home_page = requests.get(url, headers=headers, cookies=login(), verify=False)
 
     parse_home_page = BeautifulSoup(home_page.content, 'html.parser')
     category_listing = []
@@ -93,7 +95,7 @@ def load_sports_categories():
     """Retrieve a list of all sports categories"""
 
     url = f"https://sport.sky.ch/{'de' if lang == 'de' else 'en'}/sports"
-    home_page = requests.get(url, headers=headers, cookies=login())
+    home_page = requests.get(url, headers=headers, cookies=login(), verify=False)
 
     parse_home_page = BeautifulSoup(home_page.content, 'html.parser')
     category_listing = []
@@ -123,7 +125,7 @@ def load_show_contents(content_type, category):
 
     url = f"https://show.sky.ch/de/{'filme' if content_type == 'movie' else 'serien'}" if lang == "de" else \
         f"https://show.sky.ch/en/{'movies' if content_type == 'movie' else 'tv-series'}"
-    home_page = requests.get(url, headers=headers, cookies=login())
+    home_page = requests.get(url, headers=headers, cookies=login(), verify=False)
 
     parse_home_page = BeautifulSoup(home_page.content, 'html.parser')
     menu_listing_prepare = []
@@ -177,7 +179,7 @@ def load_sports_contents(category):
     """Retrieve all sports items mentioned on webpage"""
 
     url = f"https://sport.sky.ch/{category}"
-    home_page = requests.get(url, headers=headers, cookies=login())
+    home_page = requests.get(url, headers=headers, cookies=login(), verify=False)
 
     parse_home_page = BeautifulSoup(home_page.content, 'html.parser')
     menu_listing_prepare = []
@@ -209,14 +211,14 @@ def load_content_details(content_type, content_id, content_url):
     """Get advanced movie/series details"""
 
     url = f"https://show.sky.ch{content_url}"
-    tv_details = requests.get(url, headers=headers, cookies=login())
+    tv_details = requests.get(url, headers=headers, cookies=login(), verify=False)
 
     parse_content_page = BeautifulSoup(tv_details.content, 'html.parser')
 
     menu_dict = dict()
 
-    menu_dict["fan_art"] = f"https://s3.sky.ch/img/moviecover/ch/images/scenes/{content_id}/1_1280x720.jpg"
-    menu_dict["img"] = f"https://s3.sky.ch/img/moviecover/ch/images/logo/png/{content_id}_600w.png"
+    menu_dict["fan_art"] = f"https://gateway.prd.sky.ch/imageapi/fiction/scene?param=" + urllib.parse.quote(f'{{"movId":{content_id},"format":"webp","size":"1920x1080","quality":60}}')
+    menu_dict["img"] = f"https://gateway.prd.sky.ch/imageapi/fiction/logo?param=" + urllib.parse.quote(f'{{"movId":{content_id},"format":"webp","size":"600x232","quality":80}}')
 
     for title in parse_content_page.findAll("h1"):
         menu_dict["title"] = title.text.replace("\n", "").replace("  ", "")
@@ -280,12 +282,11 @@ def load_content_details(content_type, content_id, content_url):
 
         # EPISODES
         for item in parse_content_page.findAll("ul", {"id": "seasonSelectDropdownMobile"}):
-            index = 0
-            for season in item.findAll("li"):
-                index = index + 1
+            index = len(item.findAll("li"))
 
+            for season in item.findAll("li"):
                 url = f"https://show.sky.ch{content_url}/{season['data-link']}"
-                tv_details = requests.get(url, headers=headers, cookies=login())
+                tv_details = requests.get(url, headers=headers, cookies=login(), verify=False)
 
                 parse_season_page = BeautifulSoup(tv_details.content, 'html.parser')
 
@@ -293,7 +294,7 @@ def load_content_details(content_type, content_id, content_url):
                     content_dict.update({episode["data-id"]: {"type": "2"}})
                     content_dict[episode["data-id"]].update({
                         "fan_art":
-                            f"https://s3.sky.ch/img/moviecover/ch/images/scenes/{episode['data-id']}/1_1280x720.jpg",
+                            f'https://gateway.prd.sky.ch/imageapi/fiction/scene?param=' + urllib.parse.quote(f'{{"movId":{episode["data-id"]},"format":"webp","size":"1920x1080","quality":50}}'),
                         "img": menu_dict["img"], "year": menu_dict["details"]["year"],
                         "director": menu_dict["cast"]["director"], "cast": menu_dict["cast"]["actor"]})
                     for title in episode.findAll("h5"):
@@ -305,6 +306,8 @@ def load_content_details(content_type, content_id, content_url):
                             {"duration": duration.text.replace("  ", "").replace("\n", "").replace(" min", "")})
                     for desc in episode.findAll("p", {"class": "text-14"}):
                         content_dict[episode["data-id"]].update({"desc": desc.text.replace("  ", "").replace("\n", "")})
+                
+                index = index - 1
 
         # BONUS CONTENT
         for item in parse_content_page.findAll("div", {"id": "bonusesContent"}):
@@ -377,7 +380,7 @@ def load_sports_tournament_contents(content_url, content_type=None, content_valu
     """Get tournament listings"""
 
     url = f"https://sport.sky.ch{content_url}"
-    tv_details = requests.get(url, headers=headers, cookies=login())
+    tv_details = requests.get(url, headers=headers, cookies=login(), verify=False)
 
     parse_content_page = BeautifulSoup(tv_details.content, 'html.parser')
 
@@ -536,7 +539,7 @@ def get_stream(channel_id, content_type, sky_type):
     new_header = headers
     new_header['x-requested-with'] = 'XMLHttpRequest'
 
-    tv = requests.get(url, headers=new_header, cookies=login())
+    tv = requests.get(url, headers=new_header, cookies=login(), verify=False)
     tv_json = tv.json()
     xbmc.log(str(tv_json))
 
@@ -669,18 +672,18 @@ def login():
         return ""
 
     # Retrieve cookie from sky.ch
-    login_headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36'}  
+    login_headers = headers
     session_data = {}
     cookies = {}
-    login_headers.update({"referer": "https://show.sky.ch/de/tv/", "tv": "desktop"})
+    login_headers.update({"referer": "https://show.sky.ch/de/tv/", "tv": "Emulator"})
     login_url = 'https://show.sky.ch/de/login?forceClassicalTvLogin=True'
     auth_url = 'https://show.sky.ch/de/Authentication/Login'
     app_url = 'https://show.sky.ch/de/AppTv/Connect'
     cookie_url = 'https://raw.githubusercontent.com/sunsettrack4/zattoo_tvh/additional/cookies.json'
     try:
-        login_page = requests.get(login_url, timeout=5, headers=login_headers)
+        login_page = requests.get(login_url, timeout=5, headers=login_headers, verify=False)
         login_page.raise_for_status()
-        cookie_page = requests.get(cookie_url, timeout=5)
+        cookie_page = requests.get(cookie_url, timeout=5, verify=False)
         cookie_page.raise_for_status()
         cookie_check = cookie_page.json()
         cookie_token = login_page.cookies.get(cookie_check["rvt"])
@@ -695,7 +698,7 @@ def login():
                                        '"key1":-1,"key2":-1,"key3":-1,"key4":-1,"key5":-1,"key6":-1,"key7":-1,'
                                        '"key8":-1,"key9":-1}}'}
         data = {'username': __login, 'password': __password, cookie_check["rvtp"]: page_token, 'returnUrl': 'Home/HomeTv', 'subscriptionUrl': '/de/subscription'}
-        login_page = requests.post(auth_url, timeout=5, headers=login_headers, cookies=cookies, data=data, allow_redirects=False)
+        login_page = requests.post(auth_url, timeout=5, headers=login_headers, cookies=cookies, data=data, allow_redirects=False, verify=False)
         login_page.raise_for_status()
         sky_cookie = {cookie_check["cc"]: login_page.cookies.get(cookie_check["cc"]), cookie_check["cc2"]: login_page.cookies.get(cookie_check["cc"]), cookie_check["asp"]: asp_cookie, "DesktopUUID": str(uuid4()).replace("-", "")}
         with open(f"{data_dir}/cookie.txt", "w") as file:
@@ -707,4 +710,5 @@ def login():
         return ""
 
 if __name__ == "__main__":
+    login()
     router(sys.argv[2])
